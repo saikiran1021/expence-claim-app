@@ -6,6 +6,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { verifyDocument } from '@/ai/flows/verify-document-flow';
+import { useToast } from '@/hooks/use-toast';
 
 import { CLAIM_LIMITS, CLAIM_TYPES, RETURN_PERCENTAGE } from '@/lib/constants';
 
@@ -14,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent } from '@/components/ui/card';
-import { DollarSign, Loader2, UploadCloud, CheckCircle2 } from 'lucide-react';
+import { DollarSign, Loader2, UploadCloud, CheckCircle2, XCircle } from 'lucide-react';
 
 const formSchema = z.object({
   claimType: z.enum([CLAIM_TYPES.MOBILE, CLAIM_TYPES.BROADBAND], {
@@ -42,8 +44,10 @@ const formSchema = z.object({
 
 export function ClaimCreateForm() {
   const router = useRouter();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [rejected, setRejected] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -68,15 +72,46 @@ export function ClaimCreateForm() {
     return { maxAmount: max, returnAmount: calculatedReturn };
   }, [claimType, claimAmount]);
 
+  const fileToDataUri = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        resolve(reader.result as string);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true);
-    
-    // Simulate API call to process claim
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    
+    setRejected(false);
+    setSubmitted(false);
+
+    try {
+      const photoDataUri = await fileToDataUri(values.file);
+      const result = await verifyDocument({ photoDataUri });
+
+      if (result.isDocument) {
+        setSubmitted(true);
+      } else {
+        setRejected(true);
+        toast({
+          variant: "destructive",
+          title: "Claim Rejected",
+          description: "The uploaded file does not appear to be a valid document. Please upload a clear image of a bill or receipt.",
+        });
+      }
+    } catch (error) {
+      console.error("Verification failed", error);
+      toast({
+        variant: "destructive",
+        title: "Submission Error",
+        description: "There was a problem verifying your document. Please try again.",
+      });
+    }
+
     setLoading(false);
-    setSubmitted(true);
   }
 
   if (submitted) {
@@ -87,6 +122,22 @@ export function ClaimCreateForm() {
         <p className="mt-2 text-muted-foreground">Your payment has been processed successfully.</p>
         <Button onClick={() => router.push('/dashboard')} className="mt-6">
           Go to Dashboard
+        </Button>
+      </div>
+    )
+  }
+
+  if (rejected) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center">
+        <XCircle className="h-16 w-16 text-destructive" />
+        <h3 className="mt-4 text-2xl font-bold">Claim Rejected</h3>
+        <p className="mt-2 text-muted-foreground">The uploaded file does not appear to be a valid document. Please upload a clear image of your bill or receipt.</p>
+        <Button onClick={() => {
+            setRejected(false);
+            form.reset();
+        }} className="mt-6" variant="outline">
+          Try Again
         </Button>
       </div>
     )
