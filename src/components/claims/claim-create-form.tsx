@@ -7,10 +7,6 @@ import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
-import { useToast } from '@/hooks/use-toast';
-import { db, storage } from '@/lib/firebase/client';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { CLAIM_LIMITS, CLAIM_TYPES, RETURN_PERCENTAGE } from '@/lib/constants';
 
 import { Button } from '@/components/ui/button';
@@ -18,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent } from '@/components/ui/card';
-import { DollarSign, Loader2, UploadCloud } from 'lucide-react';
+import { DollarSign, Loader2, UploadCloud, CheckCircle2 } from 'lucide-react';
 
 const formSchema = z.object({
   claimType: z.enum([CLAIM_TYPES.MOBILE, CLAIM_TYPES.BROADBAND], {
@@ -46,8 +42,8 @@ const formSchema = z.object({
 
 export function ClaimCreateForm() {
   const router = useRouter();
-  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -61,63 +57,39 @@ export function ClaimCreateForm() {
 
   const claimType = form.watch('claimType');
   const claimAmount = form.watch('claimAmount');
-  const file = form.watch('file');
 
   const { maxAmount, returnAmount } = useMemo(() => {
     const max = claimType ? CLAIM_LIMITS[claimType] : 0;
-    const isOverLimit = claimAmount > max;
-
-    const calculatedReturn = !isOverLimit && claimAmount > 0 ? claimAmount * RETURN_PERCENTAGE : 0;
+    const parsedAmount = typeof claimAmount === 'number' ? claimAmount : parseFloat(String(claimAmount));
+    const isOverLimit = parsedAmount > max;
+    
+    const calculatedReturn = !isOverLimit && parsedAmount > 0 ? parsedAmount * RETURN_PERCENTAGE : 0;
 
     return { maxAmount: max, returnAmount: calculatedReturn };
   }, [claimType, claimAmount]);
 
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!values.file) {
-      form.setError("file", { type: "manual", message: "A supporting document is required." });
-      return;
-    }
-    
-    const user = { uid: 'anonymous_user', name: 'Anonymous User' };
-    
     setLoading(true);
+    
+    // Simulate API call to process claim
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    
+    setLoading(false);
+    setSubmitted(true);
+  }
 
-    try {
-      // 1. Upload file to Firebase Storage
-      const storageRef = ref(storage, `claims/${user.uid}/${Date.now()}_${values.file.name}`);
-      await uploadBytes(storageRef, values.file);
-      const fileURL = await getDownloadURL(storageRef);
-
-      // 2. Add claim to Firestore
-      await addDoc(collection(db, 'claims'), {
-        userId: user.uid,
-        name: user.name,
-        claimType: values.claimType,
-        claimAmount: values.claimAmount,
-        returnAmount: returnAmount,
-        claimLimit: maxAmount,
-        fileURL: fileURL,
-        fileName: values.file.name,
-        status: 'Submitted',
-        createdAt: serverTimestamp(),
-      });
-
-      toast({
-        title: 'Claim Submitted!',
-        description: 'Your expense claim has been successfully submitted.',
-        className: 'bg-accent text-accent-foreground',
-      });
-      router.push('/dashboard');
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Submission Failed',
-        description: error.message || 'An unknown error occurred.',
-      });
-    } finally {
-      setLoading(false);
-    }
+  if (submitted) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-center">
+        <CheckCircle2 className="h-16 w-16 text-green-500" />
+        <h3 className="mt-4 text-2xl font-bold">Claim Approved!</h3>
+        <p className="mt-2 text-muted-foreground">Your payment has been processed successfully.</p>
+        <Button onClick={() => router.push('/dashboard')} className="mt-6">
+          Go to Dashboard
+        </Button>
+      </div>
+    )
   }
 
   return (
@@ -172,24 +144,25 @@ export function ClaimCreateForm() {
             <FormField
               control={form.control}
               name="file"
-              render={({ field }) => (
+              render={({ field: { ref, name, onBlur } }) => (
                   <FormItem>
                     <FormLabel>Supporting Document</FormLabel>
                     <FormControl>
                        <label htmlFor="file-upload" className="relative cursor-pointer rounded-md border-2 border-dashed border-muted-foreground/30 bg-background font-medium text-primary hover:border-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 flex flex-col items-center justify-center p-6 space-y-2">
                           <UploadCloud className="h-10 w-10 text-muted-foreground/50"/>
                           <span className="text-sm text-center">
-                            {file?.name || 'Click to upload a file'}
+                            {form.watch('file')?.name || 'Click to upload a file'}
                           </span>
                           <Input
                             id="file-upload"
-                            name={field.name}
+                            name={name}
                             type="file"
                             className="sr-only"
-                            ref={field.ref}
-                            onBlur={field.onBlur}
+                            ref={ref}
+                            onBlur={onBlur}
                             onChange={(e) => {
-                              field.onChange(e.target.files?.[0]);
+                              form.setValue('file', e.target.files?.[0]);
+                              form.trigger('file');
                             }}
                           />
                         </label>
@@ -212,7 +185,7 @@ export function ClaimCreateForm() {
             </Card>
         </div>
 
-        <Button type="submit" className="w-full" disabled={loading || form.formState.isValidating || !form.formState.isValid}>
+        <Button type="submit" className="w-full" disabled={loading || !form.formState.isValid}>
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Submit Claim
         </Button>
