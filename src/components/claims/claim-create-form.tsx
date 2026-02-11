@@ -51,7 +51,12 @@ export function ClaimCreateForm() {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    mode: 'onChange',
+    mode: 'onBlur',
+    defaultValues: {
+      claimType: undefined,
+      claimAmount: '',
+      file: undefined
+    }
   });
 
   const claimType = form.watch('claimType');
