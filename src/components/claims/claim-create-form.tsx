@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -47,18 +47,29 @@ export function ClaimCreateForm() {
   const { maxAmount, returnAmount } = useMemo(() => {
     const max = claimType ? CLAIM_LIMITS[claimType] : 0;
     const isOverLimit = claimAmount > max;
-    
-    form.clearErrors('claimAmount');
-    if (claimType && isOverLimit) {
-      form.setError('claimAmount', {
-        type: 'manual',
-        message: `Amount cannot exceed $${max} for ${claimType} claims.`,
-      });
-    }
 
     const calculatedReturn = !isOverLimit && claimAmount > 0 ? claimAmount * RETURN_PERCENTAGE : 0;
 
     return { maxAmount: max, returnAmount: calculatedReturn };
+  }, [claimType, claimAmount]);
+
+  useEffect(() => {
+    if (claimType) {
+      const max = CLAIM_LIMITS[claimType];
+      const isOverLimit = claimAmount > max;
+      
+      if (isOverLimit) {
+        form.setError('claimAmount', {
+          type: 'manual',
+          message: `Amount cannot exceed $${max} for ${claimType} claims.`,
+        });
+      } else {
+        // Only clear the error if it was manually set by this effect.
+        if (form.formState.errors.claimAmount?.type === 'manual') {
+          form.clearErrors('claimAmount');
+        }
+      }
+    }
   }, [claimType, claimAmount, form]);
 
 
