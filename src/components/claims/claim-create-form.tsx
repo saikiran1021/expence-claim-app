@@ -204,13 +204,13 @@ export function ClaimCreateForm() {
                  <p className="text-sm text-muted-foreground mt-1">This is 83% of your valid claim amount, up to the limit of ${maxAmount}.</p>
               </CardContent>
             </Card>
-
-            <Button type="submit" className="w-full" disabled={loading || form.formState.isValidating || !form.formState.isValid}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Submit Claim
-            </Button>
           </>
         )}
+
+        <Button type="submit" className="w-full" disabled={loading || form.formState.isValidating || !form.formState.isValid}>
+          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Submit Claim
+        </Button>
       </form>
     </Form>
   );
