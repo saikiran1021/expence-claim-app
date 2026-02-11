@@ -133,12 +133,17 @@ export function ClaimCreateForm() {
         <XCircle className="h-16 w-16 text-destructive" />
         <h3 className="mt-4 text-2xl font-bold">Claim Rejected</h3>
         <p className="mt-2 text-muted-foreground">The uploaded file does not appear to be a valid document. Please upload a clear image of your bill or receipt.</p>
-        <Button onClick={() => {
-            setRejected(false);
-            form.reset();
-        }} className="mt-6" variant="outline">
-          Try Again
-        </Button>
+        <div className="mt-6 flex gap-4">
+          <Button onClick={() => {
+              setRejected(false);
+              form.reset();
+          }} variant="outline">
+            Try Again
+          </Button>
+          <Button onClick={() => router.push('/dashboard')}>
+            Back to Dashboard
+          </Button>
+        </div>
       </div>
     )
   }
