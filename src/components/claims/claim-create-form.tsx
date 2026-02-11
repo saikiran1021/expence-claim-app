@@ -6,7 +6,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 
-import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase/client';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
@@ -32,7 +31,6 @@ const formSchema = z.object({
 });
 
 export function ClaimCreateForm() {
-  const { user } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -65,10 +63,8 @@ export function ClaimCreateForm() {
 
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!user) {
-      toast({ variant: 'destructive', title: 'Not authenticated' });
-      return;
-    }
+    const user = { uid: 'anonymous_user', name: 'Anonymous User' };
+    
     if (values.claimAmount > maxAmount) {
         form.setError('claimAmount', { type: 'manual', message: `Amount exceeds limit of $${maxAmount}.` });
         return;

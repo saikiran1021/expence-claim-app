@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase/client';
-import { useAuth } from '@/hooks/use-auth';
 import type { Claim } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,17 +13,13 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 
 export function ClaimsTable() {
-  const { user } = useAuth();
   const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
-
     setLoading(true);
     const q = query(
       collection(db, 'claims'),
-      where('userId', '==', user.uid),
       orderBy('createdAt', 'desc')
     );
 
@@ -45,7 +40,7 @@ export function ClaimsTable() {
     );
 
     return () => unsubscribe();
-  }, [user]);
+  }, []);
 
   const getStatusBadge = (status: Claim['status']) => {
     switch (status) {
@@ -126,7 +121,7 @@ export function ClaimsTable() {
                     </TableCell>
                     <TableCell>{getStatusBadge(claim.status)}</TableCell>
                     <TableCell>
-                      {format(claim.createdAt.toDate(), 'MMM dd, yyyy')}
+                      {claim.createdAt ? format(claim.createdAt.toDate(), 'MMM dd, yyyy') : null}
                     </TableCell>
                     <TableCell>
                       <Link

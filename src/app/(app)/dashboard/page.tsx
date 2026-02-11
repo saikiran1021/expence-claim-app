@@ -2,19 +2,16 @@
 
 import { ClaimsTable } from '@/components/claims/claims-table';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/hooks/use-auth';
 import { PlusCircle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function DashboardPage() {
-  const { user } = useAuth();
-
   return (
     <div className="container mx-auto">
       <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Welcome, {user?.name}!</h1>
-          <p className="text-muted-foreground">Here are your recent expense claims.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Welcome!</h1>
+          <p className="text-muted-foreground">Here are the recent expense claims.</p>
         </div>
         <Button asChild size="lg">
           <Link href="/claim/new">
