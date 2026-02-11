@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useMemo, useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase/client';
@@ -28,7 +29,7 @@ const formSchema = z.object({
     .positive({ message: 'Claim amount must be positive.' })
     .max(10000, { message: 'Amount seems too high.' }),
   file: z.instanceof(File, { message: 'A supporting document is required.' })
-    .refine((file) => file.size > 0, 'File cannot be empty.'),
+    .refine((file) => file && file.size > 0, 'A supporting document is required.'),
 }).superRefine((data, ctx) => {
     if (data.claimType && data.claimAmount) {
         const limit = CLAIM_LIMITS[data.claimType];
@@ -47,7 +48,6 @@ export function ClaimCreateForm() {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [fileName, setFileName] = useState('');
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -56,6 +56,7 @@ export function ClaimCreateForm() {
 
   const claimType = form.watch('claimType');
   const claimAmount = form.watch('claimAmount');
+  const file = form.watch('file');
 
   const { maxAmount, returnAmount } = useMemo(() => {
     const max = claimType ? CLAIM_LIMITS[claimType] : 0;
@@ -68,6 +69,11 @@ export function ClaimCreateForm() {
 
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!values.file) {
+      form.setError("file", { type: "manual", message: "A supporting document is required." });
+      return;
+    }
+    
     const user = { uid: 'anonymous_user', name: 'Anonymous User' };
     
     setLoading(true);
@@ -134,8 +140,7 @@ export function ClaimCreateForm() {
           )}
         />
 
-        {claimType && (
-          <>
+        <div className={cn("space-y-8", !claimType && "hidden")}>
             <FormField
               control={form.control}
               name="claimAmount"
@@ -159,31 +164,27 @@ export function ClaimCreateForm() {
               )}
             />
             
-            <Controller
-                control={form.control}
-                name="file"
-                render={({ field: { onChange, onBlur, name, ref } }) => (
+            <FormField
+              control={form.control}
+              name="file"
+              render={({ field }) => (
                   <FormItem>
                     <FormLabel>Supporting Document</FormLabel>
                     <FormControl>
                        <label htmlFor="file-upload" className="relative cursor-pointer rounded-md border-2 border-dashed border-muted-foreground/30 bg-background font-medium text-primary hover:border-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 flex flex-col items-center justify-center p-6 space-y-2">
                           <UploadCloud className="h-10 w-10 text-muted-foreground/50"/>
                           <span className="text-sm text-center">
-                            {fileName || 'Click to upload a file'}
+                            {file?.name || 'Click to upload a file'}
                           </span>
                           <Input
                             id="file-upload"
-                            name={name}
+                            name={field.name}
                             type="file"
                             className="sr-only"
-                            ref={ref}
-                            onBlur={onBlur}
+                            ref={field.ref}
+                            onBlur={field.onBlur}
                             onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                onChange(file);
-                                setFileName(file.name);
-                              }
+                              field.onChange(e.target.files?.[0]);
                             }}
                           />
                         </label>
@@ -204,8 +205,7 @@ export function ClaimCreateForm() {
                  <p className="text-sm text-muted-foreground mt-1">This is 83% of your valid claim amount, up to the limit of ${maxAmount}.</p>
               </CardContent>
             </Card>
-          </>
-        )}
+        </div>
 
         <Button type="submit" className="w-full" disabled={loading || form.formState.isValidating || !form.formState.isValid}>
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
