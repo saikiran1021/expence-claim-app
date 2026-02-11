@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -27,8 +27,21 @@ const formSchema = z.object({
     .number()
     .positive({ message: 'Claim amount must be positive.' })
     .max(10000, { message: 'Amount seems too high.' }),
-  file: z.instanceof(File).refine((file) => file.size > 0, 'A supporting document is required.'),
+  file: z.instanceof(File, { message: 'A supporting document is required.' })
+    .refine((file) => file.size > 0, 'File cannot be empty.'),
+}).superRefine((data, ctx) => {
+    if (data.claimType && data.claimAmount) {
+        const limit = CLAIM_LIMITS[data.claimType];
+        if (data.claimAmount > limit) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["claimAmount"],
+                message: `Amount cannot exceed $${limit} for ${data.claimType} claims.`,
+            });
+        }
+    }
 });
+
 
 export function ClaimCreateForm() {
   const router = useRouter();
@@ -53,34 +66,10 @@ export function ClaimCreateForm() {
     return { maxAmount: max, returnAmount: calculatedReturn };
   }, [claimType, claimAmount]);
 
-  useEffect(() => {
-    if (claimType) {
-      const max = CLAIM_LIMITS[claimType];
-      const isOverLimit = claimAmount > max;
-      
-      if (isOverLimit) {
-        form.setError('claimAmount', {
-          type: 'manual',
-          message: `Amount cannot exceed $${max} for ${claimType} claims.`,
-        });
-      } else {
-        // Only clear the error if it was manually set by this effect.
-        if (form.formState.errors.claimAmount?.type === 'manual') {
-          form.clearErrors('claimAmount');
-        }
-      }
-    }
-  }, [claimType, claimAmount, form]);
-
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     const user = { uid: 'anonymous_user', name: 'Anonymous User' };
     
-    if (values.claimAmount > maxAmount) {
-        form.setError('claimAmount', { type: 'manual', message: `Amount exceeds limit of $${maxAmount}.` });
-        return;
-    }
-
     setLoading(true);
 
     try {
